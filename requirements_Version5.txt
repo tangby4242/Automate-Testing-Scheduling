@@ -1,3 +1,4 @@
+# Legacy compatibility copy. Use requirements.txt as the canonical dependency list.
 pandas
 openpyxl
 pyyaml

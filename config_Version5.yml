@@ -1,34 +1,15 @@
-# Config for main_msforms.py
-# NOTE: per your Option B request these URLs are stored here. If resources require auth,
-# add EXCEL_BEARER_TOKEN as a secret in GitHub Actions or make the resources publicly accessible.
+# Legacy compatibility copy. Use config.yml as the canonical configuration.
+# NOTE: If the Excel file or form requires authentication, place a token in the
+# GitHub Actions secret EXCEL_BEARER_TOKEN or make the resource publicly accessible.
 
-# SharePoint-hosted Excel file (your provided URL)
 excel_path: "https://pgone.sharepoint.com/sites/SgICBabyCareLabanalysts-Analyticalteam/Shared%20Documents/Schedule_Test%20.xlsx?web=1"
-
-# Sheet name to read
 sheet_name: "stability"
-
-# Skip first N rows (0-based). Not used when single_row is set.
 start_row: 0
-
-# Specify a single 1-based row to process (Row 2 = single_row: 2)
 single_row: 2
-
-# Simulation mode (true = dry-run; will NOT launch Playwright or submit)
-# Set to false to perform real submission.
 simulate: false
-
-# Seconds to wait between submissions
 delay_seconds: 2
-
-# If you want a real run in CI, set headless to true
 headless: true
-
-# The Microsoft Forms URL (your provided form)
 form_url: "https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=KxmWNfX9LE6m-qy3Bslj2OziVSk3X-JEr2jZfbBWi6pUQURRN0hFTFVQRVlZVjI3N0pUUVo0RVJVWC4u"
-
-# Mapping from Excel header -> visible question text on the form.
-# Replace the right-hand strings with the exact (or unique partial) visible question text shown on the form.
 mapping:
   "Name": "Name"
   "Email": "Email"
