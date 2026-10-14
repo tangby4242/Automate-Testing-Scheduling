@@ -26,30 +26,37 @@ from playwright.sync_api import sync_playwright, TimeoutError as PWTimeoutError
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-# Load config
-cfg_path = Path("config.yml")
-if not cfg_path.exists():
-    logging.error("Missing config.yml in repo root.")
-    raise SystemExit(1)
+# Config resolution: prefer explicit env override, then config.yml, then config_Version5.yml.
+cfg_env = os.environ.get("CONFIG_PATH")
+if cfg_env:
+    cfg_path = Path(cfg_env)
+else:
+    candidates = [Path("config.yml"), Path("config_Version5.yml")]
+    cfg_path = next((p for p in candidates if p.exists()), candidates[0])
+    if not cfg_path.exists():
+        logging.error("Missing config file. Set CONFIG_PATH or add config.yml/config_Version5.yml in the repo root.")
+        raise SystemExit(1)
+
 config = yaml.safe_load(cfg_path.read_text())
 
-EXCEL_PATH = config.get("excel_path", "data/input.xlsx")
-SHEET_NAME = config.get("sheet_name", 0)
-START_ROW = int(config.get("start_row", 0))
-SINGLE_ROW = config.get("single_row", None)  # 1-based row number if provided
-DELAY = float(config.get("delay_seconds", 2))
+EXCEL_PATH = os.environ.get("EXCEL_PATH") or config.get("excel_path", "data/input.xlsx")
+SHEET_NAME = os.environ.get("SHEET_NAME") or config.get("sheet_name", 0)
+START_ROW = int(os.environ.get("START_ROW") or config.get("start_row", 0))
+SINGLE_ROW = os.environ.get("SINGLE_ROW") or config.get("single_row", None)
+DELAY = float(os.environ.get("DELAY_SECONDS") or config.get("delay_seconds", 2))
 HEADLESS = bool(config.get("headless", True))
-SIMULATE = bool(config.get("simulate", False))
+_sim_env = os.environ.get("SIMULATE")
+if _sim_env is None:
+    SIMULATE = bool(config.get("simulate", False))
+else:
+    SIMULATE = str(_sim_env).lower() in ("1", "true", "yes")
 
 FORM_URL = os.environ.get("FORM_URL") or config.get("form_url")
 if not FORM_URL:
-    logging.error("FORM_URL not set in env or config.yml.")
+    logging.error("FORM_URL not set in env or config.")
     raise SystemExit(1)
 
-# Mapping: "Excel column header" -> "Visible question label text in form"
 MAPPING = config.get("mapping", {})
-
-# Optional auth for downloading Excel from SharePoint / protected host
 EXCEL_BEARER_TOKEN = os.environ.get("EXCEL_BEARER_TOKEN") or config.get("excel_bearer_token")
 
 
@@ -108,7 +115,6 @@ def simulate_row_actions(row_idx, row):
 
 
 def find_and_fill_input(page, label: str, value: str) -> bool:
-    # Try get_by_label
     try:
         fld = page.get_by_label(label, exact=False)
         if fld.count() > 0:
@@ -117,7 +123,6 @@ def find_and_fill_input(page, label: str, value: str) -> bool:
     except Exception:
         pass
 
-    # Try aria-label/placeholder selectors
     try:
         sel = f"input[aria-label*='{label}'], textarea[aria-label*='{label}'], input[placeholder*='{label}'], textarea[placeholder*='{label}']"
         fld = page.locator(sel)
@@ -127,10 +132,9 @@ def find_and_fill_input(page, label: str, value: str) -> bool:
     except Exception:
         pass
 
-    # Find a question block containing the label and fill an input inside it
     try:
         esc = label.replace('"', '\\"')
-        xpath = "//div[contains(normalize-space(.), \"{}\")]" .format(esc)
+        xpath = "//div[contains(normalize-space(.), \"{}\")]".format(esc)
         q = page.locator("xpath=" + xpath).first
         if q and q.count() > 0:
             fld = q.locator("input, textarea, [role='textbox']")
@@ -146,24 +150,21 @@ def find_and_fill_input(page, label: str, value: str) -> bool:
 def find_and_choose_option(page, label: str, value: str) -> bool:
     try:
         esc = label.replace('"', '\\"')
-        xpath = "//div[contains(normalize-space(.), \"{}\")]" .format(esc)
+        xpath = "//div[contains(normalize-space(.), \"{}\")]".format(esc)
         q = page.locator("xpath=" + xpath).first
         if not q or q.count() == 0:
             return False
 
-        # Exact text match first
         opt = q.locator(f"text=\"{value}\"")
         if opt.count() > 0:
             opt.first.click()
             return True
 
-        # Partial match inside question block
         opt = q.locator(f"xpath=.//*[contains(normalize-space(.), \"{value}\")]")
         if opt.count() > 0:
             opt.first.click()
             return True
 
-        # Try radio/checkbox roles
         try:
             rb = q.get_by_role("radio", name=value)
             if rb.count() > 0:
@@ -202,7 +203,6 @@ def submit_one_row_live(page, row_idx, row):
             result["status"] = f"missing_field:{q_label}"
             return result
 
-        # Click submit (multiple fallbacks)
         submit_selectors = [
             "button:has-text('Submit')",
             "button:has-text('Send')",
@@ -283,7 +283,6 @@ def main():
         logging.info(f"Simulation complete. Results written to {out_path}")
         return
 
-    # Live mode: launch browser and submit
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=HEADLESS)
         page = browser.new_page()
