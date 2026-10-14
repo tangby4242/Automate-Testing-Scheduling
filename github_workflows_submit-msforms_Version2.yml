@@ -20,16 +20,15 @@ jobs:
       - name: Install dependencies and browsers
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements_Version5.txt
           python -m playwright install --with-deps chromium
 
       - name: Run Microsoft Form submitter
         env:
-          # Config.yml contains form_url and excel_path per Option B.
-          # If your SharePoint Excel requires authentication, add EXCEL_BEARER_TOKEN as a repository secret.
+          CONFIG_PATH: config_Version5.yml
           EXCEL_BEARER_TOKEN: ${{ secrets.EXCEL_BEARER_TOKEN }}
         run: |
-          python main_msforms.py
+          python main_msforms_Version4.py
 
       - name: Upload processed results
         uses: actions/upload-artifact@v4
